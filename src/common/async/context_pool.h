@@ -31,6 +31,10 @@
 #include "common/ceph_mutex.h"
 #include "common/Thread.h"
 
+#ifdef HAVE_SCHED
+#include <sched.h>
+#endif
+
 namespace ceph::async {
 class io_context_pool {
   std::vector<std::thread> threadvec;
@@ -38,6 +42,8 @@ class io_context_pool {
   std::optional<boost::asio::executor_work_guard<
 		  boost::asio::io_context::executor_type>> guard;
   ceph::mutex m = make_mutex("ceph::io_context_pool::m");
+  size_t cpu_set_size = 0;
+  cpu_set_t cpu_set;
 
   void cleanup() noexcept {
     guard = std::nullopt;
@@ -46,6 +52,18 @@ class io_context_pool {
     }
     threadvec.clear();
   }
+
+  void apply_cpu_affinity([[maybe_unused]] int thread_id) noexcept {
+#ifdef HAVE_SCHED
+    if (cpu_set_size > 0) {
+      // Set CPU affinity for this thread
+      if (sched_setaffinity(0, cpu_set_size, &cpu_set) == 0) {
+        sched_yield();
+      }
+    }
+#endif
+  }
+
 public:
   io_context_pool() noexcept {}
 
@@ -59,6 +77,12 @@ public:
   ~io_context_pool() {
     stop();
   }
+  void set_cpu_affinity(size_t size, const cpu_set_t *set) noexcept {
+    auto l = std::scoped_lock(m);
+    cpu_set_size = size;
+    cpu_set = *set;
+  }
+
   void start(std::int16_t threadcnt) noexcept {
     auto l = std::scoped_lock(m);
     if (threadvec.empty()) {
@@ -66,7 +90,8 @@ public:
       ioctx.restart();
       for (std::int16_t i = 0; i < threadcnt; ++i) {
 	threadvec.emplace_back(make_named_thread("io_context_pool",
-						 [this] {
+						 [this, i] {
+						   apply_cpu_affinity(i);
 						   ioctx.run();
 						 }));
       }
@@ -80,7 +105,8 @@ public:
       ioctx.restart();
       for (std::int16_t i = 0; i < threadcnt; ++i) {
 	threadvec.emplace_back(make_named_thread("io_context_pool",
-						 [this, init=std::move(init)] {
+						 [this, i, init=std::move(init)] {
+						   apply_cpu_affinity(i);
 						   std::move(init)();
 						   ioctx.run();
 						 }));
