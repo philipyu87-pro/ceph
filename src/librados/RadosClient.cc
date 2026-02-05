@@ -1202,7 +1202,7 @@ void librados::RadosClient::handle_conf_change(const ConfigProxy& conf,
 {
   if (changed.count("librados_thread_count") || changed.count("librados_thread_cpuset")) {
     poolctx.stop();
-    
+
     // Apply CPU affinity if configured
     std::string cpuset_str = conf.get_val<std::string>("librados_thread_cpuset");
     if (!cpuset_str.empty()) {
@@ -1218,7 +1218,7 @@ void librados::RadosClient::handle_conf_change(const ConfigProxy& conf,
                    << "': " << cpp_strerror(r) << dendl;
       }
     }
-    
+
     poolctx.start(conf.get_val<std::uint64_t>("librados_thread_count"));
   }
   if (changed.count("rados_mon_op_timeout")) {

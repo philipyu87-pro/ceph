@@ -53,7 +53,7 @@ class io_context_pool {
     threadvec.clear();
   }
 
-  void apply_cpu_affinity([[maybe_unused]] int thread_id) noexcept {
+  void apply_cpu_affinity() noexcept {
 #ifdef HAVE_SCHED
     if (cpu_set_size > 0) {
       // Set CPU affinity for this thread
@@ -92,8 +92,8 @@ public:
       ioctx.restart();
       for (std::int16_t i = 0; i < threadcnt; ++i) {
 	threadvec.emplace_back(make_named_thread("io_context_pool",
-						 [this, i] {
-						   apply_cpu_affinity(i);
+						 [this] {
+						   apply_cpu_affinity();
 						   ioctx.run();
 						 }));
       }
@@ -107,8 +107,8 @@ public:
       ioctx.restart();
       for (std::int16_t i = 0; i < threadcnt; ++i) {
 	threadvec.emplace_back(make_named_thread("io_context_pool",
-						 [this, i, init=std::move(init)] {
-						   apply_cpu_affinity(i);
+						 [this, init=std::move(init)] {
+						   apply_cpu_affinity();
 						   std::move(init)();
 						   ioctx.run();
 						 }));
