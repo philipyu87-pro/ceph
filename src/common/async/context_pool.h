@@ -76,7 +76,7 @@ class io_context_pool {
         char msg_buf[512];
         
         // Use thread-safe strerror_r (handle both POSIX and GNU versions)
-        #if defined(_POSIX_C_SOURCE) && _POSIX_C_SOURCE >= 200112L && !defined(_GNU_SOURCE)
+        #if (defined(_POSIX_C_SOURCE) && _POSIX_C_SOURCE >= 200112L) && !defined(_GNU_SOURCE)
         // POSIX version: returns int, writes to buffer
         strerror_r(err, err_buf, sizeof(err_buf));
         const char* err_str = err_buf;
@@ -121,6 +121,8 @@ public:
   ~io_context_pool() {
     stop();
   }
+
+#ifdef HAVE_SCHED
   void set_cpu_affinity(size_t size, const cpu_set_t *set) noexcept {
     auto l = std::scoped_lock(m);
     // This should only be called before start() or after stop()
@@ -129,6 +131,7 @@ public:
     cpu_set_size = size;
     cpu_set = *set;
   }
+#endif
 
   void start(std::int16_t threadcnt) noexcept {
     auto l = std::scoped_lock(m);
