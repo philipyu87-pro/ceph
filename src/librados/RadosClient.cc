@@ -1177,8 +1177,9 @@ int librados::RadosClient::get_inconsistent_pgs(int64_t pool_id,
 void librados::RadosClient::apply_cpu_affinity_config(const std::string& cpuset_str)
 {
   if (!cpuset_str.empty()) {
-    // cpu_set_size receives the highest CPU index + 1 from parse_cpu_set_list
-    // This value is used to track that affinity is configured
+    // cpu_set_size receives the highest CPU index + 1 from parse_cpu_set_list.
+    // It's used as a flag (> 0 means affinity is configured).
+    // Note: sched_setaffinity always uses sizeof(cpu_set_t) for the size parameter.
     size_t cpu_set_size = 0;
     cpu_set_t cpu_set;
     int r = parse_cpu_set_list(cpuset_str.c_str(), &cpu_set_size, &cpu_set);

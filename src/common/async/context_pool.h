@@ -76,7 +76,7 @@ class io_context_pool {
         char msg_buf[512];
         
         // Use thread-safe strerror_r (handle both POSIX and GNU versions)
-        #if (defined(_POSIX_C_SOURCE) && _POSIX_C_SOURCE >= 200112L) && !defined(_GNU_SOURCE)
+        #if defined(_POSIX_C_SOURCE) && _POSIX_C_SOURCE >= 200112L && !defined(_GNU_SOURCE)
         // POSIX version: returns int, writes to buffer
         strerror_r(err, err_buf, sizeof(err_buf));
         const char* err_str = err_buf;
@@ -93,7 +93,7 @@ class io_context_pool {
         // snprintf returns the number of chars that would be written (excluding null)
         // If truncated, len >= sizeof(msg_buf), so we write sizeof(msg_buf) - 1
         if (len > 0) {
-          size_t write_len = (len < (int)sizeof(msg_buf)) ? len : sizeof(msg_buf) - 1;
+          size_t write_len = ((size_t)len < sizeof(msg_buf)) ? len : sizeof(msg_buf) - 1;
           (void)write(STDERR_FILENO, msg_buf, write_len);
         }
       } else {
@@ -107,7 +107,8 @@ class io_context_pool {
 public:
   io_context_pool() noexcept {
 #ifdef HAVE_SCHED
-    CPU_ZERO(&cpu_set);  // Initialize cpu_set to clean state
+    // Initialize cpu_set to a clean state for platforms with scheduler support
+    CPU_ZERO(&cpu_set);
 #endif
   }
 
