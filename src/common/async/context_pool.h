@@ -72,12 +72,28 @@ class io_context_pool {
         // Log error to stderr since we don't have access to CephContext here
         // This is a non-fatal error - the thread will continue without affinity
         int err = errno;
-        char buf[256];
-        snprintf(buf, sizeof(buf),
-                 "io_context_pool: failed to set CPU affinity: %s (errno=%d)\n",
-                 strerror(err), err);
-        // Use write() instead of fprintf for async-signal-safety
-        (void)write(STDERR_FILENO, buf, strlen(buf));
+        char err_buf[256];
+        char msg_buf[512];
+        
+        // Use thread-safe strerror_r (POSIX version)
+        #if (_POSIX_C_SOURCE >= 200112L) && !_GNU_SOURCE
+        strerror_r(err, err_buf, sizeof(err_buf));
+        const char* err_str = err_buf;
+        #else
+        // GNU version returns char* (may be static buffer or err_buf)
+        const char* err_str = strerror_r(err, err_buf, sizeof(err_buf));
+        #endif
+        
+        int len = snprintf(msg_buf, sizeof(msg_buf),
+                          "io_context_pool: failed to set CPU affinity: %s (errno=%d)\n",
+                          err_str, err);
+        
+        // Write complete message to stderr
+        // Partial writes are acceptable for diagnostic messages
+        if (len > 0) {
+          (void)write(STDERR_FILENO, msg_buf, 
+                     len < (int)sizeof(msg_buf) ? len : sizeof(msg_buf) - 1);
+        }
       } else {
         // Yield to allow the scheduler to migrate this thread to the appropriate CPU
         sched_yield();
