@@ -43,7 +43,7 @@ class io_context_pool {
 		  boost::asio::io_context::executor_type>> guard;
   ceph::mutex m = make_mutex("ceph::io_context_pool::m");
   size_t cpu_set_size = 0;
-  cpu_set_t cpu_set;
+  cpu_set_t cpu_set;  // Only modified before threads start, safe to read from threads
 
   void cleanup() noexcept {
     guard = std::nullopt;
@@ -57,8 +57,10 @@ class io_context_pool {
 #ifdef HAVE_SCHED
     if (cpu_set_size > 0) {
       // Set CPU affinity for this thread
-      // cpu_set_size is used to track that affinity is enabled, 
-      // but we always pass sizeof(cpu_set_t) to sched_setaffinity
+      // cpu_set_size is used to track that affinity is enabled,
+      // but we always pass sizeof(cpu_set_t) to sched_setaffinity.
+      // This is safe because cpu_set is only modified before threads start
+      // (in set_cpu_affinity, which is always called before start()).
       if (sched_setaffinity(0, sizeof(cpu_set_t), &cpu_set) == 0) {
         sched_yield();
       }
@@ -67,7 +69,11 @@ class io_context_pool {
   }
 
 public:
-  io_context_pool() noexcept {}
+  io_context_pool() noexcept {
+#ifdef HAVE_SCHED
+    CPU_ZERO(&cpu_set);  // Initialize cpu_set to clean state
+#endif
+  }
 
   io_context_pool(std::int64_t threadcnt) noexcept {
     start(threadcnt);
@@ -81,6 +87,9 @@ public:
   }
   void set_cpu_affinity(size_t size, const cpu_set_t *set) noexcept {
     auto l = std::scoped_lock(m);
+    // This should only be called before start() or after stop()
+    // to avoid race conditions with running threads
+    ceph_assert(threadvec.empty());
     cpu_set_size = size;
     cpu_set = *set;
   }

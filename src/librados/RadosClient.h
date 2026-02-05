@@ -96,6 +96,8 @@ private:
 
   int wait_for_osdmap();
 
+  void apply_cpu_affinity_config(const std::string& cpuset_str);
+
 public:
   boost::asio::strand<boost::asio::io_context::executor_type>
       finish_strand{poolctx.get_executor()};
