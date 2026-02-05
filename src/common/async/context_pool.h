@@ -75,12 +75,13 @@ class io_context_pool {
         char err_buf[256];
         char msg_buf[512];
         
-        // Use thread-safe strerror_r (POSIX version)
-        #if (_POSIX_C_SOURCE >= 200112L) && !_GNU_SOURCE
+        // Use thread-safe strerror_r (handle both POSIX and GNU versions)
+        #if defined(_POSIX_C_SOURCE) && _POSIX_C_SOURCE >= 200112L && !defined(_GNU_SOURCE)
+        // POSIX version: returns int, writes to buffer
         strerror_r(err, err_buf, sizeof(err_buf));
         const char* err_str = err_buf;
         #else
-        // GNU version returns char* (may be static buffer or err_buf)
+        // GNU version: returns char* (may point to static buffer or err_buf)
         const char* err_str = strerror_r(err, err_buf, sizeof(err_buf));
         #endif
         
@@ -88,11 +89,12 @@ class io_context_pool {
                           "io_context_pool: failed to set CPU affinity: %s (errno=%d)\n",
                           err_str, err);
         
-        // Write complete message to stderr
-        // Partial writes are acceptable for diagnostic messages
+        // Write error message to stderr
+        // snprintf returns the number of chars that would be written (excluding null)
+        // If truncated, len >= sizeof(msg_buf), so we write sizeof(msg_buf) - 1
         if (len > 0) {
-          (void)write(STDERR_FILENO, msg_buf, 
-                     len < (int)sizeof(msg_buf) ? len : sizeof(msg_buf) - 1);
+          size_t write_len = (len < (int)sizeof(msg_buf)) ? len : sizeof(msg_buf) - 1;
+          (void)write(STDERR_FILENO, msg_buf, write_len);
         }
       } else {
         // Yield to allow the scheduler to migrate this thread to the appropriate CPU

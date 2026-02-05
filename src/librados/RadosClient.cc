@@ -1177,17 +1177,18 @@ int librados::RadosClient::get_inconsistent_pgs(int64_t pool_id,
 void librados::RadosClient::apply_cpu_affinity_config(const std::string& cpuset_str)
 {
   if (!cpuset_str.empty()) {
-    // cpu_count is an output parameter that receives the highest CPU index + 1
-    size_t cpu_count = 0;
+    // cpu_set_size receives the highest CPU index + 1 from parse_cpu_set_list
+    // This value is used to track that affinity is configured
+    size_t cpu_set_size = 0;
     cpu_set_t cpu_set;
     // Note: parse_cpu_set_list calls CPU_ZERO internally, but we do it here
     // for defensive programming and to make the code more self-documenting
     CPU_ZERO(&cpu_set);
-    int r = parse_cpu_set_list(cpuset_str.c_str(), &cpu_count, &cpu_set);
+    int r = parse_cpu_set_list(cpuset_str.c_str(), &cpu_set_size, &cpu_set);
     if (r == 0) {
       ldout(cct, 1) << "setting librados thread pool CPU affinity to "
                     << cpuset_str << dendl;
-      poolctx.set_cpu_affinity(cpu_count, &cpu_set);
+      poolctx.set_cpu_affinity(cpu_set_size, &cpu_set);
     } else {
       lderr(cct) << "failed to parse librados_thread_cpuset '" << cpuset_str
                  << "': " << cpp_strerror(r) << dendl;
