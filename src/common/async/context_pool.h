@@ -57,7 +57,9 @@ class io_context_pool {
 #ifdef HAVE_SCHED
     if (cpu_set_size > 0) {
       // Set CPU affinity for this thread
-      if (sched_setaffinity(0, cpu_set_size, &cpu_set) == 0) {
+      // cpu_set_size is used to track that affinity is enabled, 
+      // but we always pass sizeof(cpu_set_t) to sched_setaffinity
+      if (sched_setaffinity(0, sizeof(cpu_set_t), &cpu_set) == 0) {
         sched_yield();
       }
     }
