@@ -43,7 +43,11 @@ class io_context_pool {
 		  boost::asio::io_context::executor_type>> guard;
   ceph::mutex m = make_mutex("ceph::io_context_pool::m");
   size_t cpu_set_size = 0;
-  cpu_set_t cpu_set;  // Only modified before threads start, safe to read from threads
+  // cpu_set is only modified in set_cpu_affinity() when threadvec is empty
+  // (enforced by assertion), ensuring no concurrent access from worker threads.
+  // Worker threads only read these values in apply_cpu_affinity() during startup,
+  // which happens after set_cpu_affinity() completes but before the thread starts work.
+  cpu_set_t cpu_set;
 
   void cleanup() noexcept {
     guard = std::nullopt;
@@ -62,6 +66,7 @@ class io_context_pool {
       // This is safe because cpu_set is only modified before threads start
       // (in set_cpu_affinity, which is always called before start()).
       if (sched_setaffinity(0, sizeof(cpu_set_t), &cpu_set) == 0) {
+        // Yield to allow the scheduler to migrate this thread to the appropriate CPU
         sched_yield();
       }
     }
