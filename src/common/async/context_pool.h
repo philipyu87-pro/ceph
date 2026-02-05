@@ -33,6 +33,9 @@
 
 #ifdef HAVE_SCHED
 #include <sched.h>
+#include <cerrno>
+#include <cstring>
+#include <unistd.h>
 #endif
 
 namespace ceph::async {
@@ -65,7 +68,17 @@ class io_context_pool {
       // but we always pass sizeof(cpu_set_t) to sched_setaffinity.
       // This is safe because cpu_set is only modified before threads start
       // (in set_cpu_affinity, which is always called before start()).
-      if (sched_setaffinity(0, sizeof(cpu_set_t), &cpu_set) == 0) {
+      if (sched_setaffinity(0, sizeof(cpu_set_t), &cpu_set) < 0) {
+        // Log error to stderr since we don't have access to CephContext here
+        // This is a non-fatal error - the thread will continue without affinity
+        int err = errno;
+        char buf[256];
+        snprintf(buf, sizeof(buf),
+                 "io_context_pool: failed to set CPU affinity: %s (errno=%d)\n",
+                 strerror(err), err);
+        // Use write() instead of fprintf for async-signal-safety
+        (void)write(STDERR_FILENO, buf, strlen(buf));
+      } else {
         // Yield to allow the scheduler to migrate this thread to the appropriate CPU
         sched_yield();
       }

@@ -1180,7 +1180,9 @@ void librados::RadosClient::apply_cpu_affinity_config(const std::string& cpuset_
     // parse_cpu_set_list modifies cpu_set_size as an output parameter
     size_t parsed_cpu_set_size = 0;
     cpu_set_t cpu_set;
-    CPU_ZERO(&cpu_set);  // Initialize to clean state
+    // Note: parse_cpu_set_list calls CPU_ZERO internally, but we do it here
+    // for defensive programming and to make the code more self-documenting
+    CPU_ZERO(&cpu_set);
     int r = parse_cpu_set_list(cpuset_str.c_str(), &parsed_cpu_set_size, &cpu_set);
     if (r == 0) {
       ldout(cct, 1) << "setting librados thread pool CPU affinity to "
