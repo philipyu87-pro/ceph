@@ -266,8 +266,9 @@ freeing cores for I/O processing::
     uadk_compressor_enabled = true
 
 This requires a Linux kernel >= 5.9 with SVA (Shared Virtual Addressing)
-support enabled. See :doc:`/radosgw/uadk-accel` for build and configuration
-details.
+support enabled. See :doc:`/radosgw/uadk-accel` for UADK build and
+configuration details (the UADK setup applies to OSD hosts regardless of
+whether RadosGW is used).
 
 Kernel Parameters
 -----------------
