@@ -13,4 +13,5 @@
    Persistent Write Log Cache <rbd-persistent-write-log-cache>
    Encryption <rbd-encryption>
    Config Settings (librbd) <rbd-config-ref/>
+   Performance Tuning <rbd-performance-tuning>
    RBD Replay <rbd-replay>
