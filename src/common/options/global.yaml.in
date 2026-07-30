@@ -6933,6 +6933,19 @@ options:
   tags:
   - client
   min: 1
+- name: librados_thread_cpuset
+  type: str
+  level: advanced
+  desc: CPU affinity set for librados threads (e.g., "0-3,5,7-9" or "" to disable)
+  long_desc: This option allows setting CPU affinity for librados worker threads to improve
+    performance in NUMA systems or when running multiple VMs. When set, librados threads
+    will be bound to the specified CPUs. Use CPU list format like "0-3,5" to specify
+    individual CPUs or ranges. Leave empty to disable CPU affinity (default behavior).
+  default: ''
+  tags:
+  - client
+  see_also:
+  - librados_thread_count
 - name: osd_asio_thread_count
   type: uint
   level: advanced

@@ -30,6 +30,7 @@
 #include "common/errno.h"
 #include "common/ceph_json.h"
 #include "common/async/blocked_completion.h"
+#include "common/numa.h"
 #include "include/buffer.h"
 #include "include/stringify.h"
 #include "include/util.h"
@@ -238,6 +239,9 @@ int librados::RadosClient::connect()
   }
 
   common_init_finish(cct);
+
+  // Apply CPU affinity if configured
+  apply_cpu_affinity_config(cct->_conf.get_val<std::string>("librados_thread_cpuset"));
 
   poolctx.start(cct->_conf.get_val<std::uint64_t>("librados_thread_count"));
 
@@ -1170,11 +1174,32 @@ int librados::RadosClient::get_inconsistent_pgs(int64_t pool_id,
   return 0;
 }
 
+void librados::RadosClient::apply_cpu_affinity_config(const std::string& cpuset_str)
+{
+  if (!cpuset_str.empty()) {
+    // cpu_set_size receives the highest CPU index + 1 from parse_cpu_set_list.
+    // It's used as a flag (> 0 means affinity is configured).
+    // Note: sched_setaffinity always uses sizeof(cpu_set_t) for the size parameter.
+    size_t cpu_set_size = 0;
+    cpu_set_t cpu_set;
+    int r = parse_cpu_set_list(cpuset_str.c_str(), &cpu_set_size, &cpu_set);
+    if (r == 0) {
+      ldout(cct, 1) << "setting librados thread pool CPU affinity to "
+                    << cpuset_str << dendl;
+      poolctx.set_cpu_affinity(cpu_set_size, &cpu_set);
+    } else {
+      lderr(cct) << "failed to parse librados_thread_cpuset '" << cpuset_str
+                 << "': " << cpp_strerror(r) << dendl;
+    }
+  }
+}
+
 std::vector<std::string> librados::RadosClient::get_tracked_keys()
     const noexcept
 {
   return {
     "librados_thread_count"s,
+    "librados_thread_cpuset"s,
     "rados_mon_op_timeout"s
   };
 }
@@ -1182,8 +1207,12 @@ std::vector<std::string> librados::RadosClient::get_tracked_keys()
 void librados::RadosClient::handle_conf_change(const ConfigProxy& conf,
 					       const std::set<std::string> &changed)
 {
-  if (changed.count("librados_thread_count")) {
+  if (changed.count("librados_thread_count") || changed.count("librados_thread_cpuset")) {
     poolctx.stop();
+
+    // Apply CPU affinity if configured
+    apply_cpu_affinity_config(conf.get_val<std::string>("librados_thread_cpuset"));
+
     poolctx.start(conf.get_val<std::uint64_t>("librados_thread_count"));
   }
   if (changed.count("rados_mon_op_timeout")) {
